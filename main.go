@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,145 +20,399 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// JSON structs
-type TVShow struct {
-	ID                  uint32              `json:"id"`
-	Name                string              `json:"name"`
-	CreatedBy           []Creator           `json:"created_by"`
-	EpisodeRunTimes     []int32             `json:"episode_run_time"`
-	FirstAirDate        string              `json:"first_air_date"`
-	LastAirDate         string              `json:"last_air_date"`
-	Genres              []Genre             `json:"genres"`
-	InProduction        bool                `json:"in_production"`
-	Languages           []string            `json:"languages"`
-	Networks            []Network           `json:"Networks"`
-	OriginCountries     []string            `json:"origin_country"`
-	OriginalLanguage    string              `json:"original_language"`
-	OriginalName        string              `json:"original_name"`
-	Popularity          float32             `json:"popularity"`
-	PosterPath          *string             `json:"poster_path"`
-	ProductionCountries []ProductionCountry `json:"production_countries"`
-	Seasons             []TVSeason          `json:"seasons"`
-	Status              string              `json:"status"`
-	Type                string              `json:"type"`
-	VoteAverage         float32             `json:"vote_average"`
+type Game struct {
+	ID                    uint32             `json:"id"`
+	Name                  string             `json:"name"`
+	Slug                  string             `json:"slug"`
+	AgeRatings            []AgeRating        `json:"age_ratings" gorm:"-"`
+	AggregatedRating      float32            `json:"aggregated_rating" gorm:"column:rating"`
+	AggregatedRatingCount uint32             `json:"aggregated_rating_count" gorm:"column:reviewsCount"`
+	AlternativeNames      []AlternativeName  `json:"alternative_names" gorm:"-"`
+	Category              uint8              `json:"category"`
+	Collection            *Collection        `json:"collection"`
+	Collections           []Collection       `json:"collections"`
+	Cover                 *Cover             `json:"cover"`
+	DLCs                  []uint32           `json:"dlcs"`
+	ExpandedGames         []uint32           `json:"expanded_games"`
+	Expansions            []uint32           `json:"expansions"`
+	ExternalGames         []ExternalGame     `json:"external_games"`
+	FirstReleaseDate      *uint32            `json:"first_release_date"`
+	Follows               *uint32            `json:"follows"`
+	Franchise             *Franchise         `json:"franchise"`
+	Franchises            []Franchise        `json:"franchises"`
+	GameEngines           []Engine           `json:"game_engines"`
+	GameLocalizations     []GameLocalization `json:"game_localizations"`
+	GameModes             []uint8            `json:"game_modes"`
+	Genres                []uint8            `json:"genres"`
+	Hypes                 *uint32            `json:"hypes"`
+	InvolvedCompanies     []uint32           `json:"involved_companies"`
+	LanguageSupports      []LanguageSupport  `json:"language_supports"`
+	ParentGame            *uint32            `json:"parent_game"`
+	Platforms             []uint16           `json:"platforms"`
+	PlayerPerspectives    []uint16           `json:"player_perspectives"`
+	Ports                 []uint32           `json:"ports"`
+	ReleaseDates          []ReleaseDate      `json:"release_dates"`
+	Remakes               []uint32           `json:"remakes"`
+	Remasters             []uint32           `json:"remasters"`
+	StandaloneExpansions  []uint32           `json:"standalone_expansions"`
+	Screenshots           []Screenshot       `json:"screenshots"`
+	SimilarGames          []uint32           `json:"similar_games"`
+	Status                *uint8             `json:"status"`
+	Summary               *string            `json:"summary"`
+	Themes                []uint16           `json:"themes"`
+	VersionParent         *uint32            `json:"version_parent"`
+	VersionTitle          *string            `json:"version_title"`
+	Videos                []Video            `json:"videos"`
+	Websites              []Website          `json:"websites"`
+	UpdatedAt             uint32             `json:"updated_at"`
+	Checksum              string             `json:"checksum"`
 }
 
-type Creator struct {
-	ID   uint32 `json:"id"`
-	Name string `json:"name"`
+type Collection struct {
+	ID        uint32 `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	TypeId    uint32 `json:"type"`
+	UpdatedAt uint32 `json:"updated_at"`
+	Checksum  string `json:"checksum"`
 }
 
-type Genre struct {
-	ID   uint32 `json:"id"`
-	Name string `json:"name"`
+type Franchise struct {
+	ID        uint32 `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	UpdatedAt uint32 `json:"updated_at"`
+	Checksum  string `json:"checksum"`
 }
 
-type Network struct {
+type Engine struct {
+	ID          uint32  `json:"id"`
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	Description *string `json:"description"`
+	UpdatedAt   uint32  `json:"updated_at"`
+	Checksum    string  `json:"checksum"`
+}
+
+type AgeRating struct {
+	ID                  uint32               `json:"id"`
+	Category            uint16               `json:"category"`
+	Rating              uint16               `json:"rating"`
+	RatingCoverUrl      *string              `json:"rating_cover_url"`
+	Synopsis            *string              `json:"synopsis"`
+	Checksum            string               `json:"checksum"`
+	ContentDescriptions []ContentDescription `json:"content_descriptions"`
+}
+
+type ContentDescription struct {
+	ID          uint32 `json:"id"`
+	Category    uint16 `json:"category"`
+	Description string `json:"description"`
+	Checksum    string `json:"checksum"`
+}
+
+type AlternativeName struct {
 	ID       uint32  `json:"id"`
 	Name     string  `json:"name"`
-	LogoPath *string `json:"logo_path" gorm:"column:logoPath"`
+	Comment  *string `json:"comment"`
+	Checksum string  `json:"checksum"`
 }
 
-type ProductionCountry struct {
-	ISO31661 string `json:"iso_3166_1"`
-	Name     string `json:"name"`
+type Cover struct {
+	ID           uint32  `json:"id"`
+	AlphaChannel bool    `json:"alpha_channel"`
+	Animated     bool    `json:"animated"`
+	ImageID      string  `json:"image_id"`
+	Width        *uint16 `json:"width"`
+	Height       *uint16 `json:"height"`
+	Checksum     string  `json:"checksum"`
+}
+
+type ExternalGame struct {
+	ID        uint32        `json:"id"`
+	Name      *string       `json:"name"`
+	Category  uint16        `json:"category"`
+	Countries pq.Int32Array `json:"countries"`
+	Media     *uint8        `json:"media"`
+	Platform  *uint16       `json:"platform"`
+	Url       *string       `json:"url"`
+	UpdatedAt uint32        `json:"updated_at"`
+	Checksum  string        `json:"checksum"`
+}
+
+type GameLocalization struct {
+	ID        uint32  `json:"id"`
+	Name      string  `json:"name"`
+	Region    *uint16 `json:"region"`
+	UpdatedAt uint32  `json:"updated_at"`
+	Checksum  string  `json:"checksum"`
+}
+
+type LanguageSupport struct {
+	ID                  uint32 `json:"id"`
+	Language            uint8  `json:"language"`
+	LanguageSupportType uint8  `json:"language_support_type"`
+	UpdatedAt           uint32 `json:"updated_at"`
+	Checksum            string `json:"checksum"`
+}
+
+type ReleaseDate struct {
+	ID        uint32  `json:"id"`
+	Category  uint8   `json:"category"`
+	Date      *uint32 `json:"date"`
+	Human     string  `json:"human"`
+	Month     *uint8  `json:"m"`
+	Year      *uint16 `json:"y"`
+	Status    *uint8  `json:"status"`
+	Platform  uint16  `json:"platform"`
+	Region    uint8   `json:"region"`
+	UpdatedAt uint32  `json:"updated_at"`
+	Checksum  string  `json:"checksum"`
+}
+
+type Screenshot struct {
+	ID           uint32  `json:"id"`
+	AlphaChannel bool    `json:"alpha_channel"`
+	Animated     bool    `json:"animated"`
+	ImageID      string  `json:"image_id"`
+	Width        *uint16 `json:"width"`
+	Height       *uint16 `json:"height"`
+	Checksum     string  `json:"checksum"`
+}
+
+type Video struct {
+	ID       uint32  `json:"id"`
+	Name     *string `json:"name"`
+	VideoId  string  `json:"video_id"`
+	Checksum string  `json:"checksum"`
+}
+
+type Website struct {
+	ID       uint32 `json:"id"`
+	Category uint16 `json:"category"`
+	Url      string `json:"url"`
+	Trusted  bool   `json:"trusted"`
+	Checksum string `json:"checksum"`
 }
 
 // DB structs
-
-type TVShowBase struct {
-	ID               uint32
-	Name             string
-	EpisodeRunTimes  pq.Int32Array  `gorm:"type:integer[]; column:episodeRunTimes"`
-	FirstAirDate     *string        `gorm:"column:firstAirDate"`
-	LastAirDate      *string        `gorm:"column:lastAirDate"`
-	InProduction     bool           `gorm:"column:inProduction"`
-	Languages        pq.StringArray `gorm:"column:languages"`
-	OriginalLanguage string         `gorm:"column:originalLanguage"`
-	OriginalName     string         `gorm:"column:originalName"`
-	Popularity       float32
-	PosterPath       *string `gorm:"column:posterPath"`
-	Status           string
-	Type             string
-	VoteAverage      float32 `gorm:"column:voteAverage"`
+type GameBase struct {
+	ID                    uint32
+	Name                  string
+	Slug                  string
+	AggregatedRating      float32 `gorm:"column:rating"`
+	AggregatedRatingCount uint32  `gorm:"column:reviewsCount"`
+	Category              uint8
+	FirstReleaseDate      *time.Time `gorm:"column:firstReleaseDate"`
+	Follows               *uint32    `gorm:"default:0"`
+	Hypes                 *uint32    `gorm:"default:0"`
+	Status                *uint8
+	Summary               *string
+	VersionTitle          *string   `gorm:"column:versionTitle"`
+	UpdatedAt             time.Time `gorm:"column:updatedAt"`
+	Checksum              string
+	MainSeriesId          *uint32 `gorm:"column:mainSeriesId"`
+	MainFranchiseId       *uint32 `gorm:"column:mainFranchiseId"`
 }
 
-type TVSeason struct {
-	ID           uint32  `json:"id"`
-	Name         string  `json:"name"`
-	SeasonNumber uint16  `json:"season_number" gorm:"column:seasonNumber"`
-	PosterPath   *string `json:"poster_path" gorm:"column:posterPath"`
-	AirDate      string  `json:"air_date" gorm:"column:airDate"`
-	EpisodeCount *uint16 `json:"episode_count" gorm:"column:episodeCount"`
-	VoteAverage  float32 `json:"vote_average" gorm:"column:voteAverage"`
+type AgeRatingDB struct {
+	ID             uint32
+	Category       uint16
+	Rating         uint16
+	RatingCoverUrl *string `gorm:"column:ratingCoverUrl"`
+	Synopsis       *string
+	Checksum       string
+	GameId         uint32 `gorm:"column:gameId"`
 }
 
-type TVSeasonDB struct {
-	ShowID       uint32  `gorm:"column:showId"`
-	ID           uint32  `json:"id"`
-	Name         string  `json:"name"`
-	SeasonNumber uint16  `json:"season_number" gorm:"column:seasonNumber"`
-	PosterPath   *string `json:"poster_path" gorm:"column:posterPath"`
-	AirDate      *string `json:"air_date" gorm:"column:airDate"`
-	EpisodeCount *uint16 `json:"episode_count" gorm:"column:episodeCount"`
-	VoteAverage  float32 `json:"vote_average" gorm:"column:voteAverage"`
+type ContentDescriptionDB struct {
+	ID          uint32
+	Category    uint16
+	Description string
+	Checksum    string
+	AgeRatingId uint32 `gorm:"column:ageRatingId"`
 }
 
-type TVShowGenre struct {
-	ShowId  uint32 `gorm:"column:showId"`
-	GenreId uint32 `gorm:"column:genreId"`
+type AltNameDB struct {
+	ID       uint32
+	Name     string
+	Comment  *string
+	Checksum string
+	GameId   uint32 `gorm:"column:gameId"`
 }
 
-type TVShowCreator struct {
-	ShowId    uint32 `gorm:"column:showId"`
-	CreatorId uint32 `gorm:"column:creatorId"`
+type CoverDB struct {
+	ID           uint32
+	AlphaChannel bool `gorm:"column:aplhaChannel"`
+	Animated     bool
+	ImageID      string `gorm:"column:imageId"`
+	Width        *uint16
+	Height       *uint16
+	Checksum     string
+	GameId       uint32 `gorm:"column:gameId"`
 }
 
-type TVShowNetwork struct {
-	ShowId    uint32 `gorm:"column:showId"`
-	NetworkId uint32 `gorm:"column:networkId"`
+type LocalizationDB struct {
+	ID        uint32
+	Name      string
+	RegionId  *uint16   `gorm:"column:regionId"`
+	UpdatedAt time.Time `gorm:"column:updatedAt"`
+	Checksum  string
+	GameId    uint32 `gorm:"column:gameId"`
 }
 
-type TVShowOrigCountry struct {
-	ShowId     uint32 `gorm:"column:showId"`
-	CountryIso string `gorm:"column:countryIso"`
+type ExternalServiceDB struct {
+	ID         uint32
+	Name       *string
+	Category   uint16
+	Countries  pq.Int32Array
+	Media      *uint8
+	PlatformId *uint16 `gorm:"column:platformId"`
+	Url        *string
+	UpdatedAt  time.Time `gorm:"column:updatedAt"`
+	Checksum   string
+	GameId     uint32 `gorm:"column:gameId"`
 }
 
-type TVShowProdCountry struct {
-	ShowId     uint32 `gorm:"column:showId"`
-	CountryIso string `gorm:"column:countryIso"`
+type LanguageSupportDB struct {
+	ID            uint32
+	LanguageId    uint8     `gorm:"column:languageId"`
+	SupportTypeId uint8     `gorm:"column:supportTypeId"`
+	UpdatedAt     time.Time `gorm:"column:updatedAt"`
+	Checksum      string
+	GameId        uint32 `gorm:"column:gameId"`
 }
 
-type Response struct {
-	Results      []TVShowIndex `json:"results"`
-	Page         uint16        `json:"page"`
-	TotalPages   uint16        `json:"total_pages"`
-	TotalResults uint16        `json:"total_results"`
+type ReleaseDateDB struct {
+	ID         uint32
+	Category   uint8
+	Date       *time.Time
+	Human      string
+	Month      *uint8  `gorm:"column:m"`
+	Year       *uint16 `gorm:"column:y"`
+	StatusId   *uint8  `gorm:"column:statusId"`
+	PlatformId uint16  `gorm:"column:platformId"`
+	Region     uint8
+	UpdatedAt  time.Time `gorm:"column:updatedAt"`
+	Checksum   string
+	GameId     uint32 `gorm:"column:gameId"`
 }
 
-type TVShowIndex struct {
-	ID    uint32 `json:"id"`
-	Adult bool   `json:"adult"`
+type ScreenshotDB struct {
+	ID           uint32
+	AlphaChannel bool `gorm:"column:alphaChannel"`
+	Animated     bool
+	ImageID      string `gorm:"column:imageId"`
+	Width        *uint16
+	Height       *uint16
+	Checksum     string
+	GameId       uint32 `gorm:"column:gameId"`
+}
+
+type VideoDB struct {
+	ID       uint32
+	Name     *string
+	VideoId  string `gorm:"column:videoId"`
+	Checksum string
+	GameId   uint32 `gorm:"column:gameId"`
+}
+
+type WebsiteDB struct {
+	ID       uint32
+	Category uint16
+	Url      string
+	Trusted  bool
+	Checksum string
+	GameId   uint32 `gorm:"column:gameId"`
+}
+
+type CollectionDB struct {
+	ID        uint32
+	Name      string
+	Slug      string
+	TypeId    uint32    `gorm:"column:typeId"`
+	UpdatedAt time.Time `gorm:"column:updatedAt"`
+	Checksum  string
+}
+
+type FranchiseDB struct {
+	ID        uint32
+	Name      string
+	Slug      string
+	UpdatedAt time.Time `gorm:"column:updatedAt"`
+	Checksum  string
+}
+
+type EngineDB struct {
+	ID          uint32
+	Name        string
+	Slug        string
+	Description *string
+	UpdatedAt   time.Time `gorm:"column:updatedAt"`
+	Checksum    string
+}
+
+type GameCollection struct {
+	GameId       uint32 `gorm:"column:gameId"`
+	CollectionId uint32 `gorm:"column:collectionId"`
+}
+
+type GameFranchise struct {
+	GameId      uint32 `gorm:"column:gameId"`
+	FranchiseId uint32 `gorm:"column:franchiseId"`
+}
+
+type GameEngine struct {
+	GameId   uint32 `gorm:"column:gameId"`
+	EngineId uint32 `gorm:"column:engineId"`
+}
+
+type GameMode struct {
+	GameId uint32 `gorm:"column:gameId"`
+	ModeId uint8  `gorm:"column:modeId"`
+}
+
+type GameGenre struct {
+	GameId  uint32 `gorm:"column:gameId"`
+	GenreId uint8  `gorm:"column:genreId"`
+}
+
+type GamePlayerPerspective struct {
+	GameId        uint32 `gorm:"column:gameId"`
+	PerspectiveId uint16 `gorm:"column:perspectiveId"`
+}
+
+type GamePlatform struct {
+	GameId     uint32 `gorm:"column:gameId"`
+	PlatformId uint16 `gorm:"column:platformId"`
+}
+
+type GameTheme struct {
+	GameId  uint32 `gorm:"column:gameId"`
+	ThemeId uint16 `gorm:"column:themeId"`
 }
 
 var (
-	limiter           = rate.NewLimiter(rate.Every(time.Second/40), 1)
-	totalPages uint16 = 500
+	limiter = rate.NewLimiter(rate.Every(time.Second/4), 1)
 )
 
-func fetchIndexData(PageNum uint16) ([]byte, error) {
+func fetchData(pageNum uint8) ([]byte, error) {
 	if err := limiter.Wait(context.Background()); err != nil {
-		fmt.Printf("Rate limit exceeded for Page %d: %v\n", PageNum, err)
+		fmt.Printf("Rate limit exceeded for Page %d: %v\n", pageNum, err)
 	}
 
-	url := fmt.Sprintf("https://api.themoviedb.org/3/tv/changes?page=%d", PageNum)
-	req, err := http.NewRequest("GET", url, nil)
+	offsetValue := uint32(pageNum-1) * 500
+	reqBodyString := fmt.Sprintf(`fields *, age_ratings.*, age_ratings.content_descriptions.*, alternative_names.*, cover.*, game_localizations.*, external_games.*, language_supports.*, release_dates.*, screenshots.*, videos.*, websites.*, collection.*, collections.*, franchise.*, franchises.*, game_engines.*;	where themes != (42); limit 500; offset %d; sort updated_at desc;`, offsetValue)
+	reqBody := []byte(reqBodyString)
+
+	url := "https://api.igdb.com/v4/games"
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("API_ACCESS_TOKEN"))
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Client-ID", os.Getenv("TWITCH_CLIENT_ID"))
+	req.Header.Set("Authorization", "Bearer "+os.Getenv("TWITCH_TOKEN"))
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -173,151 +428,305 @@ func fetchIndexData(PageNum uint16) ([]byte, error) {
 	return body, nil
 }
 
-func fetchAndProcessIndexData(pageNum uint16, idsCh chan uint32) {
-	body, err := fetchIndexData(pageNum)
-	if err != nil {
-		fmt.Printf("Error fetching the first index page: %v\n", err)
-		return
+func convertToDate(input *uint32) *time.Time {
+	var result *time.Time
+
+	if input != nil {
+		result = &time.Time{}
+		*result = time.Unix(int64(*input), 0)
 	}
-	var rawInitData Response
-	err = json.Unmarshal(body, &rawInitData)
-	if err != nil {
-		fmt.Printf("Error unmarshalling the first index page: %v\n", err)
-		return
-	}
-	if pageNum == 1 {
-		totalPages = rawInitData.TotalPages
-	}
-	for _, entry := range rawInitData.Results {
-		if !entry.Adult {
-			idsCh <- entry.ID
-		}
-	}
+
+	return result
 }
 
-func fetchDetailsData(id uint32) ([]byte, error) {
-	if err := limiter.Wait(context.Background()); err != nil {
-		fmt.Printf("Rate limit exceeded for Page %d: %v\n", id, err)
-	}
-
-	url := fmt.Sprintf("https://api.themoviedb.org/3/tv/%d?language=en-US", id)
-	req, err := http.NewRequest("GET", url, nil)
+func fetchAndProcessData(pageNum uint8,
+	gameBaseCh chan GameBase,
+	ageRatingCh chan AgeRatingDB,
+	contentDescCh chan ContentDescriptionDB,
+	altNameCh chan AltNameDB,
+	coverCh chan CoverDB,
+	localizationCh chan LocalizationDB,
+	externalServiceCh chan ExternalServiceDB,
+	languageSupportCh chan LanguageSupportDB,
+	releaseDateCh chan ReleaseDateDB,
+	screenshotCh chan ScreenshotDB,
+	videoCh chan VideoDB,
+	websiteCh chan WebsiteDB,
+	collectionCh chan CollectionDB,
+	franchiseCh chan FranchiseDB,
+	engineCh chan EngineDB,
+	gameCollectionCh chan GameCollection,
+	gameFranchiseCh chan GameFranchise,
+	gameEngineCh chan GameEngine,
+	gameModeCh chan GameMode,
+	gameGenreCh chan GameGenre,
+	gamePlayerPerspectiveCh chan GamePlayerPerspective,
+	gamePlatformCh chan GamePlatform,
+	gameThemeCh chan GameTheme,
+) {
+	body, err := fetchData(pageNum)
 	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+os.Getenv("API_ACCESS_TOKEN"))
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected HTTP status code: %d", res.StatusCode)
-	}
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, nil
-}
-
-func filterEmptyDates(input string) *string {
-	if input != "" {
-		return &input
-	} else {
-		return nil
-	}
-}
-
-func fetchAndProcessDetailsData(id uint32, showBaseCh chan TVShowBase, seasonCh chan TVSeasonDB, genreCh chan TVShowGenre, creatorRefCh chan Creator, creatorCh chan TVShowCreator, networkRefCh chan Network, networkCh chan TVShowNetwork, origCountryCh chan TVShowOrigCountry, prodCountryCh chan TVShowProdCountry) {
-	body, err := fetchDetailsData(id)
-	if err != nil {
-		fmt.Printf("Error fetching details for ID %d: %v\n", id, err)
+		fmt.Printf("Error fetching details for Page %d: %v\n", pageNum, err)
 		return
 	}
-	var show TVShow
-	err = json.Unmarshal(body, &show)
+	var games []Game
+	err = json.Unmarshal(body, &games)
 	if err != nil {
-		fmt.Println("Error parsing JSON data for Movie ID:", id, err)
+		fmt.Println("Error parsing JSON data for Page:", pageNum, err)
 		return
 	}
 
-	showBaseCh <- TVShowBase{
-		ID:               show.ID,
-		Name:             show.Name,
-		EpisodeRunTimes:  show.EpisodeRunTimes,
-		FirstAirDate:     filterEmptyDates(show.FirstAirDate),
-		LastAirDate:      filterEmptyDates(show.LastAirDate),
-		InProduction:     show.InProduction,
-		Languages:        show.Languages,
-		OriginalLanguage: show.OriginalLanguage,
-		OriginalName:     show.OriginalName,
-		Popularity:       show.Popularity,
-		PosterPath:       show.PosterPath,
-		Status:           show.Status,
-		Type:             show.Type,
-		VoteAverage:      show.VoteAverage,
-	}
-
-	for _, season := range show.Seasons {
-		seasonCh <- TVSeasonDB{
-			ShowID:       show.ID,
-			ID:           id,
-			Name:         season.Name,
-			SeasonNumber: season.SeasonNumber,
-			PosterPath:   season.PosterPath,
-			AirDate:      filterEmptyDates(season.AirDate),
-			EpisodeCount: season.EpisodeCount,
-			VoteAverage:  season.VoteAverage,
-		}
-	}
-
-	for _, genre := range show.Genres {
-		legalGenres := [...]uint32{16, 18, 35, 37, 80, 99, 9648, 10751, 10759, 10762, 10763, 10764, 10765, 10766, 10767, 10768}
-
-		genresSet := make(map[uint32]bool)
-		for _, element := range legalGenres {
-			genresSet[element] = true
+	for _, game := range games {
+		var gameBase = GameBase{
+			ID:                    game.ID,
+			Name:                  game.Name,
+			Slug:                  game.Slug,
+			AggregatedRating:      game.AggregatedRating,
+			AggregatedRatingCount: game.AggregatedRatingCount,
+			Category:              game.Category,
+			FirstReleaseDate:      convertToDate(game.FirstReleaseDate),
+			Follows:               game.Follows,
+			Hypes:                 game.Hypes,
+			Status:                game.Status,
+			Summary:               game.Summary,
+			VersionTitle:          game.VersionTitle,
+			Checksum:              game.Checksum,
 		}
 
-		if genresSet[uint32(genre.ID)] {
-			genreCh <- TVShowGenre{
-				ShowId:  show.ID,
-				GenreId: uint32(genre.ID),
+		if game.Collection != nil {
+			gameBase.MainSeriesId = &game.Collection.ID
+		}
+		if game.Franchise != nil {
+			gameBase.MainFranchiseId = &game.Franchise.ID
+		}
+
+		gameBaseCh <- gameBase
+
+		for _, ageRating := range game.AgeRatings {
+			ageRatingCh <- AgeRatingDB{
+				ID:             ageRating.ID,
+				Category:       ageRating.Category,
+				Rating:         ageRating.Category,
+				RatingCoverUrl: ageRating.RatingCoverUrl,
+				Synopsis:       ageRating.Synopsis,
+				Checksum:       ageRating.Checksum,
+				GameId:         game.ID,
+			}
+
+			for _, contentDesc := range ageRating.ContentDescriptions {
+				contentDescCh <- ContentDescriptionDB{
+					ID:          contentDesc.ID,
+					Category:    contentDesc.Category,
+					Description: contentDesc.Description,
+					Checksum:    contentDesc.Checksum,
+					AgeRatingId: ageRating.ID,
+				}
 			}
 		}
-	}
 
-	for _, creator := range show.CreatedBy {
-		creatorRefCh <- creator
-
-		creatorCh <- TVShowCreator{
-			ShowId:    show.ID,
-			CreatorId: creator.ID,
+		for _, altName := range game.AlternativeNames {
+			altNameCh <- AltNameDB{
+				ID:       altName.ID,
+				Name:     altName.Name,
+				Comment:  altName.Comment,
+				Checksum: altName.Checksum,
+				GameId:   game.ID,
+			}
 		}
-	}
 
-	for _, network := range show.Networks {
-		networkRefCh <- network
-
-		networkCh <- TVShowNetwork{
-			ShowId:    show.ID,
-			NetworkId: network.ID,
+		if game.Cover != nil {
+			coverCh <- CoverDB{
+				ID:           game.Cover.ID,
+				AlphaChannel: game.Cover.AlphaChannel,
+				Animated:     game.Cover.Animated,
+				ImageID:      game.Cover.ImageID,
+				Width:        game.Cover.Width,
+				Height:       game.Cover.Height,
+				Checksum:     game.Cover.Checksum,
+				GameId:       game.ID,
+			}
 		}
-	}
 
-	for _, origCountry := range show.OriginCountries {
-		origCountryCh <- TVShowOrigCountry{
-			ShowId:     show.ID,
-			CountryIso: origCountry,
+		for _, localization := range game.GameLocalizations {
+			localizationCh <- LocalizationDB{
+				ID:       localization.ID,
+				Name:     localization.Name,
+				RegionId: localization.Region,
+				Checksum: localization.Checksum,
+				GameId:   game.ID,
+			}
 		}
-	}
 
-	for _, prodCountry := range show.ProductionCountries {
-		prodCountryCh <- TVShowProdCountry{
-			ShowId:     show.ID,
-			CountryIso: prodCountry.ISO31661,
+		for _, externalService := range game.ExternalGames {
+			externalServiceCh <- ExternalServiceDB{
+				ID:         externalService.ID,
+				Name:       externalService.Name,
+				Category:   externalService.Category,
+				Countries:  externalService.Countries,
+				Media:      externalService.Media,
+				PlatformId: externalService.Platform,
+				Url:        externalService.Url,
+				Checksum:   externalService.Checksum,
+				GameId:     game.ID,
+			}
+		}
+
+		for _, langSupp := range game.LanguageSupports {
+			languageSupportCh <- LanguageSupportDB{
+				ID:            langSupp.ID,
+				LanguageId:    langSupp.Language,
+				SupportTypeId: langSupp.LanguageSupportType,
+				Checksum:      langSupp.Checksum,
+				GameId:        game.ID,
+			}
+		}
+
+		for _, releaseDate := range game.ReleaseDates {
+			releaseDateCh <- ReleaseDateDB{
+				ID:         releaseDate.ID,
+				Category:   releaseDate.Category,
+				Date:       convertToDate(releaseDate.Date),
+				Human:      releaseDate.Human,
+				Month:      releaseDate.Month,
+				Year:       releaseDate.Year,
+				StatusId:   releaseDate.Status,
+				PlatformId: releaseDate.Platform,
+				Region:     releaseDate.Region,
+				Checksum:   releaseDate.Checksum,
+				GameId:     game.ID,
+			}
+		}
+
+		for _, screenshot := range game.Screenshots {
+			screenshotCh <- ScreenshotDB{
+				ID:           screenshot.ID,
+				AlphaChannel: screenshot.AlphaChannel,
+				Animated:     screenshot.Animated,
+				ImageID:      screenshot.ImageID,
+				Width:        screenshot.Width,
+				Height:       screenshot.Height,
+				Checksum:     screenshot.Checksum,
+				GameId:       game.ID,
+			}
+		}
+
+		for _, video := range game.Videos {
+			videoCh <- VideoDB{
+				ID:       video.ID,
+				Name:     video.Name,
+				VideoId:  video.VideoId,
+				Checksum: video.Checksum,
+				GameId:   game.ID,
+			}
+		}
+
+		for _, website := range game.Websites {
+			websiteCh <- WebsiteDB{
+				ID:       website.ID,
+				Category: website.Category,
+				Url:      website.Url,
+				Trusted:  website.Trusted,
+				Checksum: website.Checksum,
+				GameId:   game.ID,
+			}
+		}
+
+		if game.Collection != nil {
+			collectionCh <- CollectionDB{
+				ID:       game.Collection.ID,
+				Name:     game.Collection.Name,
+				Slug:     game.Collection.Slug,
+				TypeId:   game.Collection.TypeId,
+				Checksum: game.Collection.Checksum,
+			}
+		}
+
+		for _, collection := range game.Collections {
+			collectionCh <- CollectionDB{
+				ID:       collection.ID,
+				Name:     collection.Name,
+				Slug:     collection.Slug,
+				TypeId:   1,
+				Checksum: collection.Checksum,
+			}
+
+			gameCollectionCh <- GameCollection{
+				GameId:       game.ID,
+				CollectionId: collection.ID,
+			}
+		}
+
+		if game.Franchise != nil {
+			franchiseCh <- FranchiseDB{
+				ID:       game.Franchise.ID,
+				Name:     game.Franchise.Name,
+				Slug:     game.Franchise.Slug,
+				Checksum: game.Franchise.Checksum,
+			}
+		}
+
+		for _, franchise := range game.Franchises {
+			franchiseCh <- FranchiseDB{
+				ID:       franchise.ID,
+				Name:     franchise.Name,
+				Slug:     franchise.Slug,
+				Checksum: franchise.Checksum,
+			}
+
+			gameFranchiseCh <- GameFranchise{
+				GameId:      game.ID,
+				FranchiseId: franchise.ID,
+			}
+		}
+
+		for _, engine := range game.GameEngines {
+			engineCh <- EngineDB{
+				ID:          engine.ID,
+				Name:        engine.Name,
+				Slug:        engine.Slug,
+				Description: engine.Description,
+				Checksum:    engine.Checksum,
+			}
+
+			gameEngineCh <- GameEngine{
+				GameId:   game.ID,
+				EngineId: engine.ID,
+			}
+		}
+
+		for _, mode := range game.GameModes {
+			gameModeCh <- GameMode{
+				GameId: game.ID,
+				ModeId: mode,
+			}
+		}
+
+		for _, genre := range game.Genres {
+			gameGenreCh <- GameGenre{
+				GameId:  game.ID,
+				GenreId: genre,
+			}
+		}
+
+		for _, perspective := range game.PlayerPerspectives {
+			gamePlayerPerspectiveCh <- GamePlayerPerspective{
+				GameId:        game.ID,
+				PerspectiveId: perspective,
+			}
+		}
+
+		for _, platform := range game.Platforms {
+			gamePlatformCh <- GamePlatform{
+				GameId:     game.ID,
+				PlatformId: platform,
+			}
+		}
+
+		for _, theme := range game.Themes {
+			gameThemeCh <- GameTheme{
+				GameId:  game.ID,
+				ThemeId: theme,
+			}
 		}
 	}
 }
@@ -345,72 +754,107 @@ func main() {
 		panic(err)
 	}
 
-	const batchSize = 500
-	idsCh := make(chan uint32, 10000)
-	showBaseCh := make(chan TVShowBase, 10000)
-	seasonCh := make(chan TVSeasonDB, 100000)
-	genreCh := make(chan TVShowGenre, 50000)
-	creatorRefCh := make(chan Creator, 100000)
-	creatorCh := make(chan TVShowCreator, 100000)
-	networkRefCh := make(chan Network, 50000)
-	networkCh := make(chan TVShowNetwork, 50000)
-	origCountryCh := make(chan TVShowOrigCountry, 200000)
-	prodCountryCh := make(chan TVShowProdCountry, 200000)
+	const batchSize = 3000
+	const totalPages = 8
 
-	var wgInit sync.WaitGroup
-	wgInit.Add(1)
-	go func() {
-		defer wgInit.Done()
-		fetchAndProcessIndexData(1, idsCh)
-	}()
-	wgInit.Wait()
+	gameBaseCh := make(chan GameBase, 100000)
+	ageRatingCh := make(chan AgeRatingDB, 100000)
+	contentDescCh := make(chan ContentDescriptionDB, 100000)
+	altNameCh := make(chan AltNameDB, 100000)
+	coverCh := make(chan CoverDB, 100000)
+	localizationCh := make(chan LocalizationDB, 100000)
+	externalServiceCh := make(chan ExternalServiceDB, 100000)
+	languageSupportCh := make(chan LanguageSupportDB, 100000)
+	releaseDateCh := make(chan ReleaseDateDB, 100000)
+	screenshotCh := make(chan ScreenshotDB, 100000)
+	videoCh := make(chan VideoDB, 100000)
+	websiteCh := make(chan WebsiteDB, 100000)
+	collectionCh := make(chan CollectionDB, 100000)
+	franchiseCh := make(chan FranchiseDB, 100000)
+	engineCh := make(chan EngineDB, 100000)
+	gameCollectionCh := make(chan GameCollection, 100000)
+	gameFranchiseCh := make(chan GameFranchise, 100000)
+	gameEngineCh := make(chan GameEngine, 100000)
+	gameModeCh := make(chan GameMode, 100000)
+	gameGenreCh := make(chan GameGenre, 100000)
+	gamePlayerPerspectiveCh := make(chan GamePlayerPerspective, 100000)
+	gamePlatformCh := make(chan GamePlatform, 100000)
+	gameThemeCh := make(chan GameTheme, 100000)
 
 	go func() {
 		var wgFetch sync.WaitGroup
-		var i uint16
-		for i = 2; i <= totalPages; i++ {
+		var i uint8
+		for i = 1; i <= totalPages; i++ {
 			wgFetch.Add(1)
-			go func(i uint16) {
+			go func(i uint8) {
 				defer wgFetch.Done()
-				fetchAndProcessIndexData(i, idsCh)
+				pageNum := i + 48
+				fetchAndProcessData(pageNum,
+					gameBaseCh,
+					ageRatingCh,
+					contentDescCh,
+					altNameCh,
+					coverCh,
+					localizationCh,
+					externalServiceCh,
+					languageSupportCh,
+					releaseDateCh,
+					screenshotCh,
+					videoCh,
+					websiteCh,
+					collectionCh,
+					franchiseCh,
+					engineCh,
+					gameCollectionCh,
+					gameFranchiseCh,
+					gameEngineCh,
+					gameModeCh,
+					gameGenreCh,
+					gamePlayerPerspectiveCh,
+					gamePlatformCh,
+					gameThemeCh)
 			}(i)
 		}
 		wgFetch.Wait()
-		close(idsCh)
+		close(gameBaseCh)
+		close(ageRatingCh)
+		close(contentDescCh)
+		close(altNameCh)
+		close(coverCh)
+		close(localizationCh)
+		close(externalServiceCh)
+		close(languageSupportCh)
+		close(releaseDateCh)
+		close(screenshotCh)
+		close(videoCh)
+		close(websiteCh)
+		close(collectionCh)
+		close(franchiseCh)
+		close(engineCh)
+		close(gameCollectionCh)
+		close(gameFranchiseCh)
+		close(gameEngineCh)
+		close(gameModeCh)
+		close(gameGenreCh)
+		close(gamePlayerPerspectiveCh)
+		close(gamePlatformCh)
+		close(gameThemeCh)
 	}()
 
+	var wgWriteRefTables sync.WaitGroup
+	wgWriteRefTables.Add(1)
 	go func() {
-		var wgDetails sync.WaitGroup
-		for id := range idsCh {
-			wgDetails.Add(1)
-			go func(id uint32) {
-				defer wgDetails.Done()
-				fetchAndProcessDetailsData(id, showBaseCh, seasonCh, genreCh, creatorRefCh, creatorCh, networkRefCh, networkCh, origCountryCh, prodCountryCh)
-			}(id)
-		}
-		wgDetails.Wait()
-		close(showBaseCh)
-		close(seasonCh)
-		close(genreCh)
-		close(creatorCh)
-		close(creatorRefCh)
-		close(networkRefCh)
-		close(networkCh)
-		close(origCountryCh)
-		close(prodCountryCh)
+		defer wgWriteRefTables.Done()
+		writeCollectionRefRows(db, collectionCh, batchSize)
+		writeFranchiseRefRows(db, franchiseCh, batchSize)
+		writeEngineRefRows(db, engineCh, batchSize)
 	}()
 
 	var wgWriteBase sync.WaitGroup
 	wgWriteBase.Add(1)
 	go func() {
 		defer wgWriteBase.Done()
-		writeBaseRows(db, showBaseCh, batchSize)
-	}()
-	wgWriteBase.Add(1)
-	go func() {
-		defer wgWriteBase.Done()
-		writeNetworkRefRows(db, networkRefCh, batchSize)
-		writeCreatorRefRows(db, creatorRefCh, batchSize)
+		writeBaseRows(db, gameBaseCh, batchSize)
 	}()
 	wgWriteBase.Wait()
 
@@ -418,34 +862,52 @@ func main() {
 	wgWriteChild.Add(1)
 	go func() {
 		defer wgWriteChild.Done()
-		writeSeasonRows(db, seasonCh, batchSize)
+		writeAgeRatingRows(db, ageRatingCh, batchSize)
+		writeAltNameRows(db, altNameCh, batchSize)
+		writeCoverRows(db, coverCh, batchSize)
+		writeLocalizationRows(db, localizationCh, batchSize)
+		writeExternalServiceRows(db, externalServiceCh, batchSize)
+		writeLanguageSupportRows(db, languageSupportCh, batchSize)
+		writeReleaseDateRows(db, releaseDateCh, batchSize)
+		writeScreenshotRows(db, screenshotCh, batchSize)
+		writeVideoRows(db, videoCh, batchSize)
+		writeWebsiteRows(db, websiteCh, batchSize)
 	}()
 	wgWriteChild.Wait()
 
 	var wgWriteJoin sync.WaitGroup
-	wgWriteJoin.Add(1)
 	go func() {
 		defer wgWriteJoin.Done()
-		writeGenreRows(db, genreCh, batchSize)
-		writeCreatorRows(db, creatorCh, batchSize)
-		writeNetworkRows(db, networkCh, batchSize)
-		writeOrigCountryRows(db, origCountryCh, batchSize)
-		writeProdCountryRows(db, prodCountryCh, batchSize)
+		writeGameCollectionRows(db, gameCollectionCh, batchSize)
+		writeGameFranchiseRows(db, gameFranchiseCh, batchSize)
+		writeGameEngineRows(db, gameEngineCh, batchSize)
+		writeGameModeRows(db, gameModeCh, batchSize)
+		writeGameGenreRows(db, gameGenreCh, batchSize)
+		writeGamePlayerPerspectiveRows(db, gamePlayerPerspectiveCh, batchSize)
+		writeGamePlatformRows(db, gamePlatformCh, batchSize)
+		writeGameThemeRows(db, gameThemeCh, batchSize)
 	}()
 	wgWriteJoin.Wait()
+
+	var wgWriteChildSecond sync.WaitGroup
+	wgWriteChildSecond.Add(1)
+	go func() {
+		defer wgWriteChildSecond.Done()
+		writeContentDescRows(db, contentDescCh, batchSize)
+	}()
 
 	fmt.Println("Successfully fetched data and written to the DB")
 }
 
-func writeBaseRows(db *gorm.DB, dataChannel chan TVShowBase, batchSize int) {
-	var batch []TVShowBase
+func writeBaseRows(db *gorm.DB, dataChannel chan GameBase, batchSize int) {
+	var batch []GameBase
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
 			if err := writeBasesBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []TVShowBase{}
+			batch = []GameBase{}
 		}
 	}
 
@@ -455,225 +917,603 @@ func writeBaseRows(db *gorm.DB, dataChannel chan TVShowBase, batchSize int) {
 		}
 	}
 }
-func writeBasesBatch(db *gorm.DB, objects []TVShowBase) error {
+func writeBasesBatch(db *gorm.DB, objects []GameBase) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{UpdateAll: true}).Table("TVShow").Model(&TVShowBase{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{UpdateAll: true}).Table("Game").Model(&GameBase{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func writeSeasonRows(db *gorm.DB, dataChannel chan TVSeasonDB, batchSize int) {
-	var batch []TVSeasonDB
+func writeAgeRatingRows(db *gorm.DB, dataChannel chan AgeRatingDB, batchSize int) {
+	var batch []AgeRatingDB
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
-			if err := writeSeasonsBatch(db, batch); err != nil {
+			if err := writeAgeRatingsBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []TVSeasonDB{}
+			batch = []AgeRatingDB{}
 		}
 	}
 
 	if len(batch) > 0 {
-		if err := writeSeasonsBatch(db, batch); err != nil {
+		if err := writeAgeRatingsBatch(db, batch); err != nil {
 			fmt.Println("Error writing final batch:", err)
 		}
 	}
 }
-func writeSeasonsBatch(db *gorm.DB, objects []TVSeasonDB) error {
+func writeAgeRatingsBatch(db *gorm.DB, objects []AgeRatingDB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("TVSeason").Model(&TVSeasonDB{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GAgeRating").Model(&AgeRatingDB{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func writeGenreRows(db *gorm.DB, dataChannel chan TVShowGenre, batchSize int) {
-	var batch []TVShowGenre
+func writeContentDescRows(db *gorm.DB, dataChannel chan ContentDescriptionDB, batchSize int) {
+	var batch []ContentDescriptionDB
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
-			if err := writeGenresBatch(db, batch); err != nil {
+			if err := writeContentDescsBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []TVShowGenre{}
+			batch = []ContentDescriptionDB{}
 		}
 	}
 
 	if len(batch) > 0 {
-		if err := writeGenresBatch(db, batch); err != nil {
+		if err := writeContentDescsBatch(db, batch); err != nil {
 			fmt.Println("Error writing final batch:", err)
 		}
 	}
 }
-func writeGenresBatch(db *gorm.DB, objects []TVShowGenre) error {
+func writeContentDescsBatch(db *gorm.DB, objects []ContentDescriptionDB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("TVShowGenre").Model(&TVShowGenre{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GAgeRatingDescription").Model(&ContentDescriptionDB{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func writeCreatorRefRows(db *gorm.DB, dataChannel chan Creator, batchSize int) {
-	var batch []Creator
+func writeAltNameRows(db *gorm.DB, dataChannel chan AltNameDB, batchSize int) {
+	var batch []AltNameDB
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
-			if err := writeCreatorRefsBatch(db, batch); err != nil {
+			if err := writeAltNamesBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []Creator{}
+			batch = []AltNameDB{}
 		}
 	}
 
 	if len(batch) > 0 {
-		if err := writeCreatorRefsBatch(db, batch); err != nil {
+		if err := writeAltNamesBatch(db, batch); err != nil {
 			fmt.Println("Error writing final batch:", err)
 		}
 	}
 }
-func writeCreatorRefsBatch(db *gorm.DB, objects []Creator) error {
+func writeAltNamesBatch(db *gorm.DB, objects []AltNameDB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("CinemaPerson").Model(&Creator{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GAltName").Model(&AltNameDB{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func writeCreatorRows(db *gorm.DB, dataChannel chan TVShowCreator, batchSize int) {
-	var batch []TVShowCreator
+func writeCoverRows(db *gorm.DB, dataChannel chan CoverDB, batchSize int) {
+	var batch []CoverDB
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
-			if err := writeCreatorsBatch(db, batch); err != nil {
+			if err := writeCoversBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []TVShowCreator{}
+			batch = []CoverDB{}
 		}
 	}
 
 	if len(batch) > 0 {
-		if err := writeCreatorsBatch(db, batch); err != nil {
+		if err := writeCoversBatch(db, batch); err != nil {
 			fmt.Println("Error writing final batch:", err)
 		}
 	}
 }
-func writeCreatorsBatch(db *gorm.DB, objects []TVShowCreator) error {
+func writeCoversBatch(db *gorm.DB, objects []CoverDB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("TVShowCreator").Model(&TVShowCreator{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GCover").Model(&CoverDB{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func writeNetworkRefRows(db *gorm.DB, dataChannel chan Network, batchSize int) {
-	var batch []Network
+func writeLocalizationRows(db *gorm.DB, dataChannel chan LocalizationDB, batchSize int) {
+	var batch []LocalizationDB
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
-			if err := writeNetworkRefsBatch(db, batch); err != nil {
+			if err := writeLocalizationsBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []Network{}
+			batch = []LocalizationDB{}
 		}
 	}
 
 	if len(batch) > 0 {
-		if err := writeNetworkRefsBatch(db, batch); err != nil {
+		if err := writeLocalizationsBatch(db, batch); err != nil {
 			fmt.Println("Error writing final batch:", err)
 		}
 	}
 }
-func writeNetworkRefsBatch(db *gorm.DB, objects []Network) error {
+func writeLocalizationsBatch(db *gorm.DB, objects []LocalizationDB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("TVNetwork").Model(&Network{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{UpdateAll: true}).Table("GLocalization").Model(&LocalizationDB{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func writeNetworkRows(db *gorm.DB, dataChannel chan TVShowNetwork, batchSize int) {
-	var batch []TVShowNetwork
+func writeExternalServiceRows(db *gorm.DB, dataChannel chan ExternalServiceDB, batchSize int) {
+	var batch []ExternalServiceDB
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
-			if err := writeNetworksBatch(db, batch); err != nil {
+			if err := writeExternalServicesBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []TVShowNetwork{}
+			batch = []ExternalServiceDB{}
 		}
 	}
 
 	if len(batch) > 0 {
-		if err := writeNetworksBatch(db, batch); err != nil {
+		if err := writeExternalServicesBatch(db, batch); err != nil {
 			fmt.Println("Error writing final batch:", err)
 		}
 	}
 }
-func writeNetworksBatch(db *gorm.DB, objects []TVShowNetwork) error {
+func writeExternalServicesBatch(db *gorm.DB, objects []ExternalServiceDB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("TVShowNetwork").Model(&TVShowNetwork{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{UpdateAll: true}).Table("GExternalService").Model(&ExternalServiceDB{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+func writeLanguageSupportRows(db *gorm.DB, dataChannel chan LanguageSupportDB, batchSize int) {
+	var batch []LanguageSupportDB
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeLanguageSupportsBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []LanguageSupportDB{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeLanguageSupportsBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeLanguageSupportsBatch(db *gorm.DB, objects []LanguageSupportDB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{UpdateAll: true}).Table("GLanguageSupport").Model(&LanguageSupportDB{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func writeOrigCountryRows(db *gorm.DB, dataChannel chan TVShowOrigCountry, batchSize int) {
-	var batch []TVShowOrigCountry
+func writeReleaseDateRows(db *gorm.DB, dataChannel chan ReleaseDateDB, batchSize int) {
+	var batch []ReleaseDateDB
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
-			if err := writeOrigCountriesBatch(db, batch); err != nil {
+			if err := writeReleaseDatesBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []TVShowOrigCountry{}
+			batch = []ReleaseDateDB{}
 		}
 	}
 
 	if len(batch) > 0 {
-		if err := writeOrigCountriesBatch(db, batch); err != nil {
+		if err := writeReleaseDatesBatch(db, batch); err != nil {
 			fmt.Println("Error writing final batch:", err)
 		}
 	}
 }
-func writeOrigCountriesBatch(db *gorm.DB, objects []TVShowOrigCountry) error {
+func writeReleaseDatesBatch(db *gorm.DB, objects []ReleaseDateDB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("TVShowOrigCountry").Model(&TVShowOrigCountry{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{UpdateAll: true}).Table("GReleaseDate").Model(&ReleaseDateDB{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil
 	})
 }
 
-func writeProdCountryRows(db *gorm.DB, dataChannel chan TVShowProdCountry, batchSize int) {
-	var batch []TVShowProdCountry
+func writeScreenshotRows(db *gorm.DB, dataChannel chan ScreenshotDB, batchSize int) {
+	var batch []ScreenshotDB
 	for entry := range dataChannel {
 		batch = append(batch, entry)
 		if len(batch) >= batchSize {
-			if err := writeProdCountriesBatch(db, batch); err != nil {
+			if err := writeScreenshotsBatch(db, batch); err != nil {
 				fmt.Println("Error writing batch:", err)
 			}
-			batch = []TVShowProdCountry{}
+			batch = []ScreenshotDB{}
 		}
 	}
 
 	if len(batch) > 0 {
-		if err := writeProdCountriesBatch(db, batch); err != nil {
+		if err := writeScreenshotsBatch(db, batch); err != nil {
 			fmt.Println("Error writing final batch:", err)
 		}
 	}
 }
-func writeProdCountriesBatch(db *gorm.DB, objects []TVShowProdCountry) error {
+func writeScreenshotsBatch(db *gorm.DB, objects []ScreenshotDB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("TVShowProdCountry").Model(&TVShowProdCountry{}).Create(&objects).Error; err != nil {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GScreenshot").Model(&ScreenshotDB{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeVideoRows(db *gorm.DB, dataChannel chan VideoDB, batchSize int) {
+	var batch []VideoDB
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeVideosBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []VideoDB{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeVideosBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeVideosBatch(db *gorm.DB, objects []VideoDB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GVideo").Model(&VideoDB{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeWebsiteRows(db *gorm.DB, dataChannel chan WebsiteDB, batchSize int) {
+	var batch []WebsiteDB
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeWebsitesBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []WebsiteDB{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeWebsitesBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeWebsitesBatch(db *gorm.DB, objects []WebsiteDB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GWebsite").Model(&WebsiteDB{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeCollectionRefRows(db *gorm.DB, dataChannel chan CollectionDB, batchSize int) {
+	var batch []CollectionDB
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeCollectionRefsBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []CollectionDB{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeCollectionRefsBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeCollectionRefsBatch(db *gorm.DB, objects []CollectionDB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GCollection").Model(&CollectionDB{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeFranchiseRefRows(db *gorm.DB, dataChannel chan FranchiseDB, batchSize int) {
+	var batch []FranchiseDB
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeFranchiseRefsBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []FranchiseDB{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeFranchiseRefsBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeFranchiseRefsBatch(db *gorm.DB, objects []FranchiseDB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GFranchise").Model(&FranchiseDB{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeEngineRefRows(db *gorm.DB, dataChannel chan EngineDB, batchSize int) {
+	var batch []EngineDB
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeEngineRefsBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []EngineDB{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeEngineRefsBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeEngineRefsBatch(db *gorm.DB, objects []EngineDB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GEngine").Model(&EngineDB{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// Join tables
+func writeGameCollectionRows(db *gorm.DB, dataChannel chan GameCollection, batchSize int) {
+	var batch []GameCollection
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeGameCollectionsBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []GameCollection{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeGameCollectionsBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeGameCollectionsBatch(db *gorm.DB, objects []GameCollection) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GameCollection").Model(&GameCollection{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeGameFranchiseRows(db *gorm.DB, dataChannel chan GameFranchise, batchSize int) {
+	var batch []GameFranchise
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeGameFranchisesBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []GameFranchise{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeGameFranchisesBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeGameFranchisesBatch(db *gorm.DB, objects []GameFranchise) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GameFranchise").Model(&GameFranchise{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeGameEngineRows(db *gorm.DB, dataChannel chan GameEngine, batchSize int) {
+	var batch []GameEngine
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeGameEnginesBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []GameEngine{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeGameEnginesBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeGameEnginesBatch(db *gorm.DB, objects []GameEngine) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GameEngine").Model(&GameEngine{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeGameModeRows(db *gorm.DB, dataChannel chan GameMode, batchSize int) {
+	var batch []GameMode
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeGameModesBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []GameMode{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeGameModesBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeGameModesBatch(db *gorm.DB, objects []GameMode) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GameMode").Model(&GameMode{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeGameGenreRows(db *gorm.DB, dataChannel chan GameGenre, batchSize int) {
+	var batch []GameGenre
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeGameGenresBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []GameGenre{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeGameGenresBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeGameGenresBatch(db *gorm.DB, objects []GameGenre) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GameGenre").Model(&GameGenre{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeGamePlayerPerspectiveRows(db *gorm.DB, dataChannel chan GamePlayerPerspective, batchSize int) {
+	var batch []GamePlayerPerspective
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeGamePlayerPerspectivesBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []GamePlayerPerspective{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeGamePlayerPerspectivesBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeGamePlayerPerspectivesBatch(db *gorm.DB, objects []GamePlayerPerspective) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GamePlayerPerspective").Model(&GamePlayerPerspective{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeGamePlatformRows(db *gorm.DB, dataChannel chan GamePlatform, batchSize int) {
+	var batch []GamePlatform
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeGamePlatformsBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []GamePlatform{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeGamePlatformsBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeGamePlatformsBatch(db *gorm.DB, objects []GamePlatform) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GamePlatform").Model(&GamePlatform{}).Create(&objects).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func writeGameThemeRows(db *gorm.DB, dataChannel chan GameTheme, batchSize int) {
+	var batch []GameTheme
+	for entry := range dataChannel {
+		batch = append(batch, entry)
+		if len(batch) >= batchSize {
+			if err := writeGameThemesBatch(db, batch); err != nil {
+				fmt.Println("Error writing batch:", err)
+			}
+			batch = []GameTheme{}
+		}
+	}
+
+	if len(batch) > 0 {
+		if err := writeGameThemesBatch(db, batch); err != nil {
+			fmt.Println("Error writing final batch:", err)
+		}
+	}
+}
+func writeGameThemesBatch(db *gorm.DB, objects []GameTheme) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Table("GameTheme").Model(&GameTheme{}).Create(&objects).Error; err != nil {
 			return err
 		}
 		return nil

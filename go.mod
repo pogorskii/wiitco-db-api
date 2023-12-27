@@ -1,4 +1,4 @@
-module wiitco-db-tvshows-cron
+module wiitco-db-games-cron
 
 go 1.21.5
 
