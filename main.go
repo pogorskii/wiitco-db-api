@@ -788,7 +788,7 @@ func main() {
 			wgFetch.Add(1)
 			go func(i uint8) {
 				defer wgFetch.Done()
-				pageNum := i + 48
+				pageNum := i + 8
 				fetchAndProcessData(pageNum,
 					gameBaseCh,
 					ageRatingCh,
