@@ -13,7 +13,7 @@ func main() {
 	router.GET("/games/update", handleGamesUpdateRequest)
 	router.GET("/movies/update", handleMoviesUpdateRequest)
 	router.GET("/tvshows/update", handleTVShowsUpdateRequest)
-	router.Run("localhost:8080")
+	router.Run()
 }
 
 func handleRootRequest(c *gin.Context) {
