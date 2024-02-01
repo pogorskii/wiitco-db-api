@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/lib/pq"
 	"golang.org/x/time/rate"
 
@@ -738,11 +737,6 @@ func fetchAndProcessData(pageNum uint8,
 
 func updateGames() {
 	fmt.Printf("Started updating games at %s \n", time.Now().Format("15:04:05"))
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("Error loading .env file:", err)
-		return
-	}
 
 	username := os.Getenv("POSTGRES_USER")
 	password := os.Getenv("POSTGRES_PASSWORD")
@@ -755,9 +749,6 @@ func updateGames() {
 		PrepareStmt:            true,
 		SkipDefaultTransaction: true,
 	}, nil)
-	if err != nil {
-		panic(err)
-	}
 
 	const batchSize = 3000
 	const totalPages = 16

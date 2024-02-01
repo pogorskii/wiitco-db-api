@@ -4,15 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/time/rate"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"time"
-
-	"github.com/joho/godotenv"
-	"golang.org/x/time/rate"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -305,12 +303,6 @@ func fetchAndProcessDetailsData(id uint32, movieBaseCh chan MovieDB, peopleRefCh
 
 func updateMovies() {
 	fmt.Printf("Started updating movies at %s \n", time.Now().Format("15:04:05"))
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("Error loading .env file:", err)
-		return
-	}
-
 	username := os.Getenv("POSTGRES_USER")
 	password := os.Getenv("POSTGRES_PASSWORD")
 	host := os.Getenv("POSTGRES_HOST")
@@ -322,9 +314,6 @@ func updateMovies() {
 		PrepareStmt:            true,
 		SkipDefaultTransaction: true,
 	}, nil)
-	if err != nil {
-		panic(err)
-	}
 
 	const batchSize = 500
 	idsCh := make(chan uint32, 20000)

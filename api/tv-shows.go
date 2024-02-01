@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/lib/pq"
 	"golang.org/x/time/rate"
 
@@ -310,12 +309,6 @@ func fetchAndProcessTVDetailsData(id uint32, showBaseCh chan TVShowBase, seasonC
 
 func updateTVShows() {
 	fmt.Printf("Started updating TV Shows at %s \n", time.Now().Format("15:04:05"))
-	err := godotenv.Load()
-	if err != nil {
-		fmt.Println("Error loading .env file:", err)
-		return
-	}
-
 	username := os.Getenv("POSTGRES_USER")
 	password := os.Getenv("POSTGRES_PASSWORD")
 	host := os.Getenv("POSTGRES_HOST")
@@ -327,9 +320,6 @@ func updateTVShows() {
 		PrepareStmt:            true,
 		SkipDefaultTransaction: true,
 	}, nil)
-	if err != nil {
-		panic(err)
-	}
 
 	const batchSize = 500
 	idsCh := make(chan uint32, 10000)
