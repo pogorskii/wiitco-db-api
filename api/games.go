@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"bytes"
@@ -18,8 +18,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-
-	"github.com/gin-gonic/gin"
 )
 
 type Game struct {
@@ -397,6 +395,11 @@ type GameTheme struct {
 var (
 	limiter = rate.NewLimiter(rate.Every(time.Second/4), 1)
 )
+
+func Games(w http.ResponseWriter, r *http.Request) {
+	updateGames()
+	fmt.Fprintf(w, "Finished updating games DB")
+}
 
 func fetchData(pageNum uint8) ([]byte, error) {
 	if err := limiter.Wait(context.Background()); err != nil {
@@ -900,11 +903,6 @@ func updateGames() {
 	}()
 
 	fmt.Println("Successfully fetched data and written to the DB")
-}
-
-func handleGamesUpdateRequest(c *gin.Context) {
-	updateGames()
-	c.IndentedJSON(http.StatusOK, "Finished updating games DB")
 }
 
 func writeBaseRows(db *gorm.DB, dataChannel chan GameBase, batchSize int) {

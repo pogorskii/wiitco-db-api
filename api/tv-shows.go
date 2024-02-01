@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -17,8 +17,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-
-	"github.com/gin-gonic/gin"
 )
 
 // JSON structs
@@ -136,6 +134,11 @@ type TVShowIndex struct {
 var (
 	televisionLimiter = rate.NewLimiter(rate.Every(time.Second/40), 1)
 )
+
+func TVShows(w http.ResponseWriter, r *http.Request) {
+	updateTVShows()
+	fmt.Fprintf(w, "Finished updating TV shows DB")
+}
 
 func fetchTVIndexData(PageNum uint16) ([]byte, error) {
 	if err := televisionLimiter.Wait(context.Background()); err != nil {
@@ -303,11 +306,6 @@ func fetchAndProcessTVDetailsData(id uint32, showBaseCh chan TVShowBase, seasonC
 			CountryIso: prodCountry.ISO31661,
 		}
 	}
-}
-
-func handleTVShowsUpdateRequest(c *gin.Context) {
-	updateTVShows()
-	c.IndentedJSON(http.StatusOK, "Finished updating tv shows DB")
 }
 
 func updateTVShows() {

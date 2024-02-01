@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -17,8 +17,6 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-
-	"github.com/gin-gonic/gin"
 )
 
 type Response struct {
@@ -126,6 +124,11 @@ var (
 	moviesLimiter        = rate.NewLimiter(rate.Every(time.Second/40), 1)
 	totalPages    uint16 = 500
 )
+
+func Movies(w http.ResponseWriter, r *http.Request) {
+	updateMovies()
+	fmt.Fprintf(w, "Finished updating movies DB")
+}
 
 func fetchIndexData(PageNum uint16) ([]byte, error) {
 	if err := moviesLimiter.Wait(context.Background()); err != nil {
@@ -298,11 +301,6 @@ func fetchAndProcessDetailsData(id uint32, movieBaseCh chan MovieDB, peopleRefCh
 			ISO31661: releaseCountry.ISO31661,
 		}
 	}
-}
-
-func handleMoviesUpdateRequest(c *gin.Context) {
-	updateMovies()
-	c.IndentedJSON(http.StatusOK, "Finished updating movies DB")
 }
 
 func updateMovies() {
